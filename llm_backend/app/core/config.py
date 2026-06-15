@@ -12,36 +12,39 @@ class ServiceType(str, Enum):
 
 class Settings(BaseSettings):
     # Deepseek settings
-    DEEPSEEK_API_KEY: str
-    DEEPSEEK_BASE_URL: str
-    DEEPSEEK_MODEL: str
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
     
     # Vision Model settings (独立配置)
-    VISION_API_KEY: str
-    VISION_BASE_URL: str
-    VISION_MODEL: str
+    VISION_API_KEY: str = ""
+    VISION_BASE_URL: str = "https://api.moonshot.cn/v1"
+    VISION_MODEL: str = "moonshot-v1-8k-vision-preview"
     
     # Ollama settings
-    OLLAMA_BASE_URL: str
-    OLLAMA_CHAT_MODEL: str
-    OLLAMA_REASON_MODEL: str
-    OLLAMA_EMBEDDING_MODEL: str
-    OLLAMA_AGENT_MODEL: str
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_CHAT_MODEL: str = "qwen2.5:7b"
+    OLLAMA_REASON_MODEL: str = "qwen2.5:7b"
+    OLLAMA_EMBEDDING_MODEL: str = "bge-m3"
+    OLLAMA_AGENT_MODEL: str = "qwen2.5:7b"
     # Service selection
     CHAT_SERVICE: ServiceType = ServiceType.DEEPSEEK
     REASON_SERVICE: ServiceType = ServiceType.OLLAMA
     AGENT_SERVICE: ServiceType = ServiceType.DEEPSEEK
     
     # Search settings
-    SERPAPI_KEY: str
+    SERPAPI_KEY: str = ""
     SEARCH_RESULT_COUNT: int = 3
     
     # Database settings
-    DB_HOST: str
-    DB_PORT: int
-    DB_USER: str
-    DB_PASSWORD: str
-    DB_NAME: str
+    DB_TYPE: str = "mysql"  # mysql 或 sqlite
+    DATABASE_DSN: str = ""  # 优先级最高，例如 mysql+aiomysql://... 或 sqlite+aiosqlite:///...
+    SQLITE_PATH: str = "assistgen.db"
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 3306
+    DB_USER: str = "root"
+    DB_PASSWORD: str = ""
+    DB_NAME: str = "assistgen_agent"
     
     # Neo4j settings
     NEO4J_URL: str = "bolt://localhost:7687"
@@ -55,8 +58,8 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
     # Redis settings
-    REDIS_HOST: str
-    REDIS_PORT: int
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PASSWORD: str = ""
     REDIS_CACHE_EXPIRE: int = 3600
@@ -74,9 +77,17 @@ class Settings(BaseSettings):
     GRAPHRAG_RESPONSE_TYPE: str = "text"                    # 响应类型
     GRAPHRAG_COMMUNITY_LEVEL: int = 3                       # 社区级别
     GRAPHRAG_DYNAMIC_COMMUNITY: bool = False                # 是否动态选择社区
+    UPLOAD_DIR: str = "uploads"
     
     @property
     def DATABASE_URL(self) -> str:
+        if self.DATABASE_DSN:
+            return self.DATABASE_DSN
+        if self.DB_TYPE.lower() == "sqlite":
+            sqlite_path = Path(self.SQLITE_PATH)
+            if not sqlite_path.is_absolute():
+                sqlite_path = ROOT_DIR / sqlite_path
+            return f"sqlite+aiosqlite:///{sqlite_path.as_posix()}"
         return f"mysql+aiomysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     
     @property
@@ -95,4 +106,4 @@ class Settings(BaseSettings):
         env_file_encoding = "utf-8"
         case_sensitive = True
 
-settings = Settings() 
+settings = Settings()

@@ -25,7 +25,8 @@ class RedisSemanticCache:
         max_cache_size: int = 1000,  # 每个用户最大缓存条数
         cleanup_interval: int = 3600  # 清理间隔(秒)
     ):
-        self.redis = redis.from_url(redis_url or settings.REDIS_URL)
+        # Local Windows Redis 3.x does not support RESP3 HELLO.
+        self.redis = redis.from_url(redis_url or settings.REDIS_URL, protocol=2)
         self.model_name = model_name or settings.OLLAMA_EMBEDDING_MODEL
         self.score_threshold = score_threshold or settings.REDIS_CACHE_THRESHOLD
         self.prefix = f"{prefix}:{user_id}" if user_id else prefix
@@ -220,4 +221,4 @@ class RedisSemanticCache:
             logger.info(f"Cache updated for message: {user_message[:50]}...")
             
         except Exception as e:
-            logger.error(f"Error in update: {str(e)}", exc_info=True) 
+            logger.error(f"Error in update: {str(e)}", exc_info=True)

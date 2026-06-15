@@ -14,11 +14,13 @@ from app.core.logger import get_logger, log_structured
 from app.core.middleware import LoggingMiddleware
 from app.core.config import settings
 from app.api import api_router
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, Base, engine
+from app.models.user import User
 from app.models.conversation import Conversation, DialogueType
 from app.models.message import Message
 from sqlalchemy import select
 from app.services.conversation_service import ConversationService
+from app.services.rag_chat_service import RAGChatService
 import uuid
 import os
 from app.services.indexing_service import IndexingService
@@ -31,7 +33,7 @@ import json
 
 
 # 配置上传目录 - RAG 功能的
-UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR = Path(settings.UPLOAD_DIR)
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 # logger 变量就被初始化为一个日志记录器实例。
@@ -55,6 +57,13 @@ app.add_middleware(
 
 # 1. 用户注册、登录路由通过 api_router 路由挂载到 /api 前缀
 app.include_router(api_router, prefix="/api")
+
+
+@app.on_event("startup")
+async def init_database_tables():
+    """部署环境首次启动时自动创建用户、会话和消息表。"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 class ReasonRequest(BaseModel):
     messages: List[Dict[str, str]]
@@ -91,6 +100,30 @@ class LangGraphResumeRequest(BaseModel):
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+def should_stream_langgraph_content(content, metadata, message) -> bool:
+    """过滤 LangGraph 内部路由、工具和调试消息，只把用户可读答案发到前端。"""
+    if not content:
+        return False
+    if metadata.get("langgraph_node") == "analyze_and_route_query":
+        return False
+    if "research_plan" in metadata.get("tags", []):
+        return False
+    if message.additional_kwargs.get("tool_calls"):
+        return False
+
+    if isinstance(content, str):
+        stripped = content.strip()
+        if stripped.startswith("{") and '"logic"' in stripped and '"type"' in stripped:
+            return False
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, dict) and {"logic", "type"}.issubset(parsed.keys()):
+                return False
+        except Exception:
+            pass
+
+    return True
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatMessage):
@@ -218,7 +251,8 @@ async def rag_chat_endpoint(request: RAGChatRequest):
         return StreamingResponse(
             rag_chat_service.generate_stream(
                 request.messages,
-                request.index_id
+                request.index_id,
+                user_id=request.user_id,
             ),
             media_type="text/event-stream"
         )
@@ -361,7 +395,7 @@ async def langgraph_query(
                     config=thread_config
                 ):
                     # 只处理最终展示给用户的内容，跳过中间工具调用和内部状态
-                    if c.content and "research_plan" not in metadata.get("tags", []) and not c.additional_kwargs.get("tool_calls"):
+                    if should_stream_langgraph_content(c.content, metadata, c):
                         # 关键修改：使用json.dumps处理content，确保特殊字符如换行符被正确处理
                         content_json = json.dumps(c.content, ensure_ascii=False)
                         yield f"data: {content_json}\n\n"
@@ -390,7 +424,7 @@ async def langgraph_query(
                     config=thread_config
                 ):
                     # 只处理最终展示给用户的内容，跳过中间工具调用和内部状态
-                    if c.content and "research_plan" not in metadata.get("tags", []) and not c.additional_kwargs.get("tool_calls"):
+                    if should_stream_langgraph_content(c.content, metadata, c):
                         # 关键修改：使用json.dumps处理content，确保特殊字符如换行符被正确处理
                         content_json = json.dumps(c.content, ensure_ascii=False)
                         yield f"data: {content_json}\n\n"
@@ -434,7 +468,7 @@ async def langgraph_resume(request: LangGraphResumeRequest):
         async def process_resume():
             async for c, metadata in graph.astream(Command(resume=request.query), stream_mode="messages", config=thread_config):
                 # 只处理最终展示给用户的内容
-                if c.content and not c.additional_kwargs.get("tool_calls"):
+                if should_stream_langgraph_content(c.content, metadata, c):
                     # 同样使用json.dumps处理内容
                     content_json = json.dumps(c.content, ensure_ascii=False)
                     yield f"data: {content_json}\n\n"

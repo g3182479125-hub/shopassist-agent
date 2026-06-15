@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Optional
 from app.core.database import AsyncSessionLocal
 from app.models.conversation import Conversation, DialogueType
 from app.models.message import Message
@@ -33,6 +33,44 @@ class ConversationService:
             return conversation.id
 
     @staticmethod
+    async def get_recent_openai_messages(
+        conversation_id: int,
+        user_id: Optional[int] = None,
+        limit: int = 12
+    ) -> List[Dict[str, str]]:
+        """获取最近消息，转换成 OpenAI chat messages 格式。"""
+        try:
+            async with AsyncSessionLocal() as db:
+                conv_stmt = select(Conversation).where(Conversation.id == conversation_id)
+                if user_id is not None:
+                    conv_stmt = conv_stmt.where(Conversation.user_id == user_id)
+
+                conv_result = await db.execute(conv_stmt)
+                conversation = conv_result.scalar_one_or_none()
+                if not conversation:
+                    return []
+
+                stmt = (
+                    select(Message)
+                    .where(Message.conversation_id == conversation_id)
+                    .order_by(Message.created_at.desc())
+                    .limit(limit)
+                )
+                result = await db.execute(stmt)
+                rows = list(reversed(result.scalars().all()))
+
+                chat_messages: List[Dict[str, str]] = []
+                for msg in rows:
+                    if not msg.content:
+                        continue
+                    role = "assistant" if msg.sender == "assistant" else "user"
+                    chat_messages.append({"role": role, "content": msg.content})
+                return chat_messages
+        except Exception as e:
+            logger.error(f"Error loading recent messages: {str(e)}", exc_info=True)
+            return []
+
+    @staticmethod
     async def save_message(
         user_id: int, 
         conversation_id: int, 
@@ -56,8 +94,8 @@ class ConversationService:
                 result = await db.execute(stmt)
                 messages_count = len(result.all())
                 
-                # 获取用户的问题内容
-                user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
+                # 获取本轮最新的用户问题，避免前端传入历史消息时重复保存第一条旧消息
+                user_content = next((msg["content"] for msg in reversed(messages) if msg["role"] == "user"), "")
                 
                 # 如果是第一条消息，更新会话标题
                 if messages_count == 0:
@@ -197,4 +235,4 @@ class ConversationService:
                 logger.info(f"已更新会话 {conversation_id} 的名称为 {name}")
         except Exception as e:
             logger.error(f"更新会话名称失败: {str(e)}", exc_info=True)
-            raise 
+            raise

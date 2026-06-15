@@ -29,6 +29,7 @@ htmlcov/
 .env
 .env.*
 !.env.example
+!llm_backend/.env.production.example
 .venv/
 venv/
 env/
@@ -59,6 +60,7 @@ llm_backend/scripts/logs/
 
 # GraphRAG generated data/cache/output
 llm_backend/app/graphrag/data/cache/
+llm_backend/app/graphrag/data/input/
 llm_backend/app/graphrag/data/logs/
 llm_backend/app/graphrag/data/output/
 llm_backend/app/graphrag/data/pdf_outputs/
@@ -73,6 +75,7 @@ llm_backend/app/graphrag/test_data/.env
 *.faiss
 *.pkl
 *.joblib
+llm_backend/codex_upload_test.txt
 
 # Node / frontend build caches
 node_modules/

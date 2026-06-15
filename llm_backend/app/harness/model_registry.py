@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from langchain_core.language_models import BaseChatModel
-from langchain_deepseek import ChatDeepSeek
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 
 from app.core.config import ServiceType, settings
 from app.core.logger import get_logger
@@ -79,10 +79,14 @@ class ModelRegistry:
     ) -> BaseChatModel:
         normalized_tags = list(tags or [])
         if service == ServiceType.DEEPSEEK:
-            logger.info(f"Using DeepSeek model {settings.DEEPSEEK_MODEL} for {role}")
-            return ChatDeepSeek(
+            logger.info(
+                f"Using OpenAI-compatible model {settings.DEEPSEEK_MODEL} "
+                f"for {role} via {settings.DEEPSEEK_BASE_URL}"
+            )
+            return ChatOpenAI(
                 api_key=settings.DEEPSEEK_API_KEY,
-                model_name=settings.DEEPSEEK_MODEL,
+                base_url=settings.DEEPSEEK_BASE_URL,
+                model=settings.DEEPSEEK_MODEL,
                 temperature=0.7,
                 tags=normalized_tags,
             )

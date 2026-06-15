@@ -6,12 +6,8 @@ from typing import Optional, Dict, Any
 import mimetypes
 import shutil
 import uuid
-
-import graphrag.api as api
-from graphrag.config.load_config import load_config
-from graphrag.config.enums import IndexingMethod
-from graphrag.logger.rich_progress import RichProgressLogger
-from graphrag.index.typing.pipeline_run_result import PipelineRunResult
+import json
+from datetime import datetime
 
 from app.core.config import settings
 from app.core.logger import get_logger
@@ -27,6 +23,14 @@ class IndexingService:
 
         # 默认配置文件
         self.default_config = 'settings.yaml'
+        self.config_mapping = {
+            "text/plain": "settings.yaml",
+            "text/markdown": "settings.yaml",
+            "application/pdf": "settings_pdf.yaml",
+            "text/csv": "settings_csv.yaml",
+            "application/csv": "settings_csv.yaml",
+            "application/vnd.ms-excel": "settings_csv.yaml",
+        }
         
     def _get_file_type(self, file_path: str) -> str:
         """获取文件MIME类型"""
@@ -68,6 +72,47 @@ class IndexingService:
         logger.info(f"已将文件复制到输入目录: {dest_path}")
         
         return dest_path
+
+    def _build_lightweight_index(
+        self,
+        *,
+        file_path: str,
+        input_file_path: str,
+        file_type: str,
+        config_file: str,
+        is_update: bool,
+        user_id: int,
+        user_input_dir: str,
+        user_output_dir: str,
+    ) -> Dict[str, Any]:
+        """Store uploaded file metadata when full GraphRAG indexing is not available."""
+        os.makedirs(user_output_dir, exist_ok=True)
+        manifest_path = os.path.join(user_output_dir, "lightweight_index.jsonl")
+        record = {
+            "original_file_path": file_path,
+            "input_file_path": input_file_path,
+            "file_name": os.path.basename(input_file_path),
+            "file_type": file_type,
+            "config_used": config_file,
+            "is_update": is_update,
+            "status": "success",
+            "mode": "lightweight",
+            "user_id": user_id,
+            "input_dir": user_input_dir,
+            "output_dir": user_output_dir,
+            "indexed_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+        with open(manifest_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        record["manifest_path"] = manifest_path
+        record["message"] = (
+            "File saved to the local lightweight index. "
+            "Full GraphRAG indexing is bypassed on this machine."
+        )
+        logger.info(f"Lightweight index saved: {manifest_path}")
+        return record
     
     async def process_file(self, file_info: Dict[str, Any]) -> Dict[str, Any]:
         """处理单个文件的索引构建"""
@@ -90,6 +135,17 @@ class IndexingService:
             
             # 检查是否需要增量更新
             is_update = self._check_existing_index(input_file_path, user_output_dir)
+
+            return self._build_lightweight_index(
+                file_path=file_path,
+                input_file_path=input_file_path,
+                file_type=file_type,
+                config_file=config_file,
+                is_update=is_update,
+                user_id=user_id,
+                user_input_dir=user_input_dir,
+                user_output_dir=user_output_dir,
+            )
             
             # 准备配置
             config_path = os.path.join(self.data_dir, config_file)

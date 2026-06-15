@@ -5,11 +5,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 # 导入GraphRAG相关模块
-import app.graphrag.graphrag.api as api
-from app.graphrag.graphrag.config.load_config import load_config
-from app.graphrag.graphrag.callbacks.noop_query_callbacks import NoopQueryCallbacks
-from app.graphrag.graphrag.utils.storage import load_table_from_storage
-from app.graphrag.graphrag.storage.file_pipeline_storage import FilePipelineStorage
 
 # 导入配置
 from app.core.config import settings
@@ -57,6 +52,10 @@ class GraphRAGAPI:
         """初始化GraphRAG API，加载必要的数据"""
         if self.initialized:
             return
+
+        from app.graphrag.graphrag.config.load_config import load_config
+        from app.graphrag.graphrag.utils.storage import load_table_from_storage
+        from app.graphrag.graphrag.storage.file_pipeline_storage import FilePipelineStorage
             
         # 构建完整项目路径
         project_directory = os.path.join(self.project_dir, self.data_dir_name)
@@ -93,6 +92,9 @@ class GraphRAGAPI:
     async def query_graphrag(self, query: str) -> Dict[str, Any]:
         """执行GraphRAG查询"""
         await self.initialize()
+
+        import app.graphrag.graphrag.api as api
+        from app.graphrag.graphrag.callbacks.noop_query_callbacks import NoopQueryCallbacks
         
         # 创建回调对象
         callbacks = []
@@ -217,7 +219,7 @@ def create_graphrag_query_node(
                             "statement": "",
                             "parameters":"",
                             "errors": errors,
-                            "records": {"result": search_result["response"]},
+                            "records": {"result": search_result.get("response", "")},
                             "steps": ["execute_graphrag_query"],
                         }
                     )

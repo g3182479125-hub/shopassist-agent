@@ -5,15 +5,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 # 导入GraphRAG相关模块
-import app.graphrag.graphrag.api as api
-from app.graphrag.graphrag.config.load_config import load_config
-from app.graphrag.graphrag.callbacks.noop_query_callbacks import NoopQueryCallbacks
-from app.graphrag.graphrag.utils.storage import load_table_from_storage
-from app.graphrag.graphrag.storage.file_pipeline_storage import FilePipelineStorage
 from app.lg_agent.kg_sub_graph.kg_neo4j_conn import get_neo4j_graph
 from app.core.logger import get_logger
 from langchain_ollama import ChatOllama
-from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 from app.core.config import settings, ServiceType
 from app.lg_agent.kg_sub_graph.agentic_rag_agents.retrievers.cypher_examples.northwind_retriever import NorthwindCypherRetriever
 from app.lg_agent.kg_sub_graph.agentic_rag_agents.components.cypher_tools.utils import create_text2cypher_generation_node, create_text2cypher_validation_node, create_text2cypher_execution_node
@@ -68,7 +63,13 @@ def create_cypher_query_node(
         # 使用大模型执行查询/多跳/并行查询计划
         # 1. 根据.env文件中AGENT_SERVICE的设置，选择使用DeepSeek或Ollama启动的模型服务
         if settings.AGENT_SERVICE == ServiceType.DEEPSEEK:
-            model = ChatDeepSeek(api_key=settings.DEEPSEEK_API_KEY, model_name=settings.DEEPSEEK_MODEL, temperature=0.7, tags=["research_plan"])
+            model = ChatOpenAI(
+                api_key=settings.DEEPSEEK_API_KEY,
+                base_url=settings.DEEPSEEK_BASE_URL,
+                model=settings.DEEPSEEK_MODEL,
+                temperature=0.7,
+                tags=["research_plan"],
+            )
         else:
             model = ChatOllama(model=settings.OLLAMA_AGENT_MODEL, base_url=settings.OLLAMA_BASE_URL, temperature=0.7, tags=["research_plan"])
 

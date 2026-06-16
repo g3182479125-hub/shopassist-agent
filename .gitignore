@@ -97,3 +97,6 @@ llm_backend/app/graphrag/examples_notebooks/inputs/**/lancedb/
 llm_backend/app/graphrag/docs/examples_notebooks/inputs/**/*.parquet
 llm_backend/app/graphrag/examples_notebooks/inputs/**/*.parquet
 llm_backend/app/graphrag/docs/data/**/*.zip
+
+.vercel
+uv.lock

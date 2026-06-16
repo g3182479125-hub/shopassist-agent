@@ -7,7 +7,6 @@ import json
 import re
 import uuid
 
-import pandas as pd
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -93,27 +92,27 @@ class RAGChatService:
             elif query_terms and any(term in {"文", "档", "主要", "讲", "什么"} for term in query_terms):
                 scored.append((0.8, text))
 
-        for _, row in text_units.iterrows():
+        for row in text_units:
             text = str(row.get("text", ""))
             score = self._score(query_terms, text)
             if score > 0:
                 scored.append((score, text))
 
-        for _, row in entities.iterrows():
+        for row in entities:
             text = f"{row.get('title', '')}: {row.get('description', '')}"
             score = self._score(query_terms, text) + 0.3
             if score > 0.3:
                 scored.append((score, text))
 
-        for _, row in reports.iterrows():
+        for row in reports:
             text = f"{row.get('title', '')}\n{row.get('summary', '')}"
             score = self._score(query_terms, text)
             if score > 0:
                 scored.append((score, text))
 
         scored.sort(key=lambda item: item[0], reverse=True)
-        if not scored and not text_units.empty:
-            return [str(text_units.iloc[0].get("text", ""))[:1800]]
+        if not scored and text_units:
+            return [str(text_units[0].get("text", ""))[:1800]]
         return [text[:1800] for _, text in scored[:top_k]]
 
     def _load_uploaded_texts(self, user_id: int | None) -> List[str]:
@@ -178,9 +177,20 @@ class RAGChatService:
 
 
 @lru_cache(maxsize=1)
-def _load_rag_tables() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _load_rag_tables() -> tuple[List[Dict[str, object]], List[Dict[str, object]], List[Dict[str, object]]]:
+    try:
+        import pandas as pd
+    except ImportError:
+        logger.warning("pandas is not installed; parquet RAG tables are disabled.")
+        return [], [], []
+
     output_dir = Path(settings.GRAPHRAG_PROJECT_DIR) / settings.GRAPHRAG_DATA_DIR / "output"
-    text_units = pd.read_parquet(output_dir / "text_units.parquet")
-    entities = pd.read_parquet(output_dir / "entities.parquet")
-    reports = pd.read_parquet(output_dir / "community_reports.parquet")
+    try:
+        text_units = pd.read_parquet(output_dir / "text_units.parquet").to_dict("records")
+        entities = pd.read_parquet(output_dir / "entities.parquet").to_dict("records")
+        reports = pd.read_parquet(output_dir / "community_reports.parquet").to_dict("records")
+    except Exception as exc:
+        logger.warning(f"Failed to load parquet RAG tables: {exc}")
+        return [], [], []
+
     return text_units, entities, reports

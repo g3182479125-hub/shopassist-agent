@@ -4,8 +4,15 @@ import os
 import numpy as np
 import requests
 from typing import Dict, List, Tuple, Any, Optional
-from sklearn.metrics.pairwise import cosine_similarity
 from app.core.config import settings
+
+
+def _cosine_similarity(left: np.ndarray, right: np.ndarray) -> float:
+    left_norm = np.linalg.norm(left)
+    right_norm = np.linalg.norm(right)
+    if left_norm == 0 or right_norm == 0:
+        return 0.0
+    return float(np.dot(left, right) / (left_norm * right_norm))
 
 class VectorQueryMatcher:
     """基于词向量的查询匹配器，用于将用户问题匹配到预定义的Cypher查询"""
@@ -90,7 +97,7 @@ class VectorQueryMatcher:
         # 计算用户问题与所有预定义查询的相似度
         similarities = []
         for query_name, query_vector in self.query_vectors.items():
-            similarity = cosine_similarity([question_vector], [query_vector])[0][0]
+            similarity = _cosine_similarity(question_vector, query_vector)
             similarities.append((query_name, similarity))
         
         # 按相似度降序排序
@@ -232,4 +239,4 @@ def create_vector_query_matcher(
             description = query_name.replace('_', ' ')
             query_descriptions[query_name] = description
     
-    return VectorQueryMatcher(predefined_cypher_dict, query_descriptions) 
+    return VectorQueryMatcher(predefined_cypher_dict, query_descriptions)

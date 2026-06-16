@@ -3,12 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Optional
+import sys
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from app.services.llm_factory import LLMFactory
 from app.services.search_service import SearchService
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from datetime import datetime
-from pathlib import Path
 
 from app.core.logger import get_logger, log_structured
 from app.core.middleware import LoggingMiddleware
@@ -24,7 +30,6 @@ from app.services.rag_chat_service import RAGChatService
 import uuid
 import os
 from app.services.indexing_service import IndexingService
-import sys
 from app.lg_agent.lg_states import AgentState, InputState
 from app.lg_agent.utils import new_uuid
 from app.lg_agent.lg_builder import graph
@@ -32,9 +37,10 @@ from langgraph.types import Command
 import json
 
 
-# 配置上传目录 - RAG 功能的
-UPLOAD_DIR = Path(settings.UPLOAD_DIR)
-UPLOAD_DIR.mkdir(exist_ok=True)
+# 配置上传目录 - Vercel 运行时只有 /tmp 可写
+upload_dir_value = "/tmp/assistgen-uploads" if os.getenv("VERCEL") and settings.UPLOAD_DIR == "uploads" else settings.UPLOAD_DIR
+UPLOAD_DIR = Path(upload_dir_value)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # logger 变量就被初始化为一个日志记录器实例。
 # 之后，便可以在当前文件中直接使用 logger.info()、logger.error() 等方法来记录日志，而不需要进行其他操作。

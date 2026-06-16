@@ -1,7 +1,5 @@
 from typing import Any, Callable, Coroutine, Dict, List
 
-import pandas as pd
-
 from ....components.visualize.generate_chart.charts import (
     create_bar_plot,
     create_empty_plot,
@@ -32,9 +30,15 @@ def create_chart_generation_node() -> (
         """
         Generate a chart based on the provided chart details.
         """
+        try:
+            import pandas as pd
+
+            chart_data = pd.DataFrame(state.get("records"))
+        except ImportError:
+            chart_data = state.get("records") or []
 
         viz_args = {
-            "data": pd.DataFrame(state.get("records")),
+            "data": chart_data,
             "x": state.get("x_axis_key"),
             "y": state.get("y_axis_key"),
             "hue": state.get("hue_key"),

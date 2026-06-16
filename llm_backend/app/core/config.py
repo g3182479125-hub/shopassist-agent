@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from enum import Enum
 from pathlib import Path
+import os
 
 # 获取项目根目录
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -83,6 +84,8 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         if self.DATABASE_DSN:
             return self.DATABASE_DSN
+        if os.getenv("VERCEL"):
+            return "sqlite+aiosqlite:////tmp/assistgen.db"
         if self.DB_TYPE.lower() == "sqlite":
             sqlite_path = Path(self.SQLITE_PATH)
             if not sqlite_path.is_absolute():

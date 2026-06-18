@@ -1,15 +1,14 @@
-# AssistGen Agent 公网部署说明
+# ShopAssist Agent 公网部署说明
 
-本项目采用 FastAPI 后端直接托管静态前端，部署后访问根路径即可打开页面。
+本项目可以通过 FastAPI 后端托管静态前端资源，部署后访问根路径即可打开页面。
 
 ## 推荐部署方式
 
-优先使用 Render 或 Railway 的 Docker 部署：
+优先使用支持 Docker 的云平台，例如 Render、Railway 或类似服务：
 
 - 构建方式：Dockerfile
-- 启动命令：Dockerfile 已内置
 - 健康检查：`/health`
-- 默认端口：读取云平台注入的 `PORT`
+- 默认端口：读取平台注入的 `PORT`
 
 ## 必填环境变量
 
@@ -21,11 +20,11 @@ SECRET_KEY=生产环境随机密钥
 
 ## 演示数据库
 
-为了让公网版本能快速启动，默认使用：
+公网演示版本可以先使用 SQLite：
 
 ```env
 DB_TYPE=sqlite
-SQLITE_PATH=/app/data/assistgen.db
+SQLITE_PATH=/app/data/shopassist.db
 ```
 
 这样不依赖本地 MySQL，也能完成注册登录、会话创建和消息保存。正式长期运行建议换成云 MySQL，并设置：
@@ -42,12 +41,12 @@ DATABASE_DSN=mysql+aiomysql://user:password@host:3306/database
 - Neo4j：用于图谱查询和 Text2Cypher。
 - Ollama：用于本地 embedding 或本地模型推理。
 
-公网演示版本可以先不启用这些服务；相关功能会降级为普通大模型或本地轻量检索。
+公网演示版本可以先不启用这些服务，相关功能会降级为普通大模型或本地轻量检索。
 
 ## Render 快速步骤
 
 1. 在 Render 新建 Web Service。
-2. 连接 GitHub 仓库 `g3182479125-hub/assistgen-agent`。
+2. 连接 GitHub 仓库 `g3182479125-hub/shopassist-agent`。
 3. Environment 选择 Docker。
 4. 填入必填环境变量。
 5. 部署完成后访问 Render 分配的公网域名。
@@ -56,7 +55,7 @@ DATABASE_DSN=mysql+aiomysql://user:password@host:3306/database
 
 1. 在 Railway 新建 Project。
 2. 选择 Deploy from GitHub repo。
-3. 选择 `g3182479125-hub/assistgen-agent`。
+3. 选择 `g3182479125-hub/shopassist-agent`。
 4. Railway 会读取 `Dockerfile` 和 `railway.json`。
 5. 在 Variables 中填入必填环境变量。
 
